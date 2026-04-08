@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Universal SMC Chart Analyzer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg: #0a0c10;
+    --surface: #11141b;
+    --surface2: #181c26;
+    --border: #1e2436;
+    --border2: #252d42;
+    --text: #e8eaf0;
+    --text2: #7a8299;
+    --text3: #4a5268;
+    --buy: #00d4a0;
+    --buy-dim: rgba(0,212,160,0.08);
+    --sell: #ff5370;
+    --sell-dim: rgba(255,83,112,0.08);
+    --gold: #f4b942;
+    --gold-dim: rgba(244,185,66,0.1);
+    --aqua: #38bdf8;
+    --purple: #a78bfa;
+    --mono: 'Space Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+    --radius: 10px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .logo {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--buy);
+    letter-spacing: 0.06em;
+  }
+  .logo span { color: var(--text2); }
+  .header-meta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text3);
+    text-align: right;
+  }
+
+  /* ── Layout ── */
+  .app { display: grid; grid-template-columns: 300px 1fr; height: calc(100vh - 53px); overflow: hidden; }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .sidebar-section {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .section-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text3);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  /* ── Form elements ── */
+  label.field-label {
+    display: block;
+    font-size: 11px;
+    color: var(--text2);
+    margin-bottom: 4px;
+    margin-top: 10px;
+  }
+  label.field-label:first-of-type { margin-top: 0; }
+  input[type="text"], input[type="number"], select, textarea {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    padding: 8px 10px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--buy); }
+  select option { background: var(--surface); }
+  textarea { resize: vertical; min-height: 80px; font-family: var(--mono); font-size: 11px; line-height: 1.6; }
+
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  /* ── Toggle group ── */
+  .toggle-group {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+  }
+  .toggle-btn {
+    padding: 5px 10px;
+    border-radius: 5px;
+    border: 1px solid var(--border2);
+    background: transparent;
+    color: var(--text2);
+    font-family: var(--mono);
+    font-size: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .toggle-btn.active { background: var(--buy-dim); border-color: var(--buy); color: var(--buy); }
+  .toggle-btn.sell-toggle.active { background: var(--sell-dim); border-color: var(--sell); color: var(--sell); }
+
+  /* ── Analyse button ── */
+  .btn-analyse {
+    margin: 16px;
+    padding: 12px;
+    background: var(--buy);
+    color: #000;
+    border: none;
+    border-radius: var(--radius);
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    width: calc(100% - 32px);
+    transition: opacity 0.15s, transform 0.1s;
+  }
+  .btn-analyse:hover { opacity: 0.85; }
+  .btn-analyse:active { transform: scale(0.98); }
+  .btn-analyse:disabled { opacity: 0.4; cursor: default; }
+
+  /* ── Main panel ── */
+  .main {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  /* ── Tabs ── */
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    padding: 0 20px;
+  }
+  .tab {
+    padding: 12px 18px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text3);
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .tab.active { color: var(--buy); border-bottom-color: var(--buy); }
+
+  /* ── Tab content ── */
+  .tab-content { display: none; flex: 1; overflow-y: auto; padding: 20px; }
+  .tab-content.active { display: block; }
+
+  /* ── Metric cards ── */
+  .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+  .metric-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+  }
+  .metric-card .m-label { font-size: 10px; color: var(--text3); font-family: var(--mono); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
+  .metric-card .m-value { font-size: 22px; font-weight: 600; color: var(--text); font-family: var(--mono); }
+  .metric-card .m-sub { font-size: 11px; color: var(--text2); margin-top: 3px; }
+  .metric-card.buy .m-value { color: var(--buy); }
+  .metric-card.sell .m-value { color: var(--sell); }
+  .metric-card.gold .m-value { color: var(--gold); }
+  .metric-card.purple .m-value { color: var(--purple); }
+
+  /* ── Score bar ── */
+  .score-bar-wrap { height: 6px; background: var(--border2); border-radius: 3px; margin-top: 8px; overflow: hidden; }
+  .score-bar { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
+
+  /* ── Analysis output ── */
+  .analysis-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    margin-bottom: 16px;
+  }
+  .block-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text3);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .block-title::before { content: ''; display: inline-block; width: 3px; height: 14px; border-radius: 2px; background: var(--buy); }
+  .block-title.sell-block::before { background: var(--sell); }
+  .block-title.gold-block::before { background: var(--gold); }
+  .block-title.neutral-block::before { background: var(--text3); }
+
+  /* ── Signal row ── */
+  .signal-row {
+    display: grid;
+    grid-template-columns: 80px 1fr 80px;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    border: 1px solid transparent;
+  }
+  .signal-row.buy { background: var(--buy-dim); border-color: rgba(0,212,160,0.15); }
+  .signal-row.sell { background: var(--sell-dim); border-color: rgba(255,83,112,0.15); }
+  .signal-row.neutral { background: var(--surface2); }
+  .sig-dir {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .sig-dir.buy { color: var(--buy); }
+  .sig-dir.sell { color: var(--sell); }
+  .sig-text { font-size: 12px; color: var(--text2); line-height: 1.5; }
+  .sig-score { font-family: var(--mono); font-size: 12px; color: var(--gold); text-align: right; }
+
+  /* ── Badge ── */
+  .badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+  }
+  .badge.buy { background: var(--buy-dim); color: var(--buy); border: 1px solid rgba(0,212,160,0.3); }
+  .badge.sell { background: var(--sell-dim); color: var(--sell); border: 1px solid rgba(255,83,112,0.3); }
+  .badge.neutral { background: rgba(122,130,153,0.1); color: var(--text2); border: 1px solid var(--border2); }
+  .badge.gold { background: var(--gold-dim); color: var(--gold); border: 1px solid rgba(244,185,66,0.3); }
+
+  /* ── Checklist ── */
+  .checklist { list-style: none; }
+  .checklist li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 6px 0;
+    font-size: 12px;
+    color: var(--text2);
+    border-bottom: 1px solid var(--border);
+    line-height: 1.5;
+  }
+  .checklist li:last-child { border-bottom: none; }
+  .check-icon { flex-shrink: 0; margin-top: 2px; }
+  .check-icon.pass { color: var(--buy); }
+  .check-icon.fail { color: var(--sell); }
+  .check-icon.warn { color: var(--gold); }
+
+  /* ── Chart container ── */
+  .chart-wrap { position: relative; width: 100%; height: 280px; margin-bottom: 16px; }
+
+  /* ── OHLC display ── */
+  .ohlc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
+  .ohlc-cell {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px;
+    text-align: center;
+  }
+  .ohlc-lbl { font-size: 10px; font-family: var(--mono); color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; }
+  .ohlc-val { font-size: 15px; font-family: var(--mono); font-weight: 700; color: var(--text); margin-top: 3px; }
+
+  /* ── Empty/Loading state ── */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text3);
+    font-family: var(--mono);
+    font-size: 12px;
+    gap: 12px;
+    padding: 40px;
+    text-align: center;
+  }
+  .empty-icon { font-size: 36px; opacity: 0.4; }
+
+  /* ── Spinner ── */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner {
+    width: 20px; height: 20px;
+    border: 2px solid var(--border2);
+    border-top-color: var(--buy);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: inline-block;
+  }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  /* ── Responsive ── */
+  @media (max-width: 900px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar { max-height: 320px; }
+    .metric-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  /* ── Monospace text ── */
+  .mono { font-family: var(--mono); }
+  .price-tag { font-family: var(--mono); font-size: 13px; font-weight: 700; }
+
+  /* ── Section divider ── */
+  .divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+
+  /* ── SL/TP row ── */
+  .sltp-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .sltp-cell {
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .sltp-cell.sl { background: rgba(255,83,112,0.07); border: 1px solid rgba(255,83,112,0.2); color: var(--sell); }
+  .sltp-cell.tp { background: rgba(0,212,160,0.07); border: 1px solid rgba(0,212,160,0.2); color: var(--buy); }
+  .sltp-cell .lbl { font-size: 10px; color: var(--text3); letter-spacing: 0.08em; margin-bottom: 3px; }
+
+  /* ── HTF bias indicator ── */
+  .bias-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+  }
+  .bias-pill.bull { background: rgba(0,212,160,0.1); color: var(--buy); border: 1px solid rgba(0,212,160,0.25); }
+  .bias-pill.bear { background: rgba(255,83,112,0.1); color: var(--sell); border: 1px solid rgba(255,83,112,0.25); }
+  .bias-pill.neutral { background: rgba(122,130,153,0.08); color: var(--text2); border: 1px solid var(--border2); }
+  .bias-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">UNIV <span>//</span> SMC ANALYZER <span>v2.0</span></div>
+  <div class="header-meta" id="headerMeta">Enter trade data to begin analysis</div>
+</header>
+
+<div class="app">
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar">
+
+    <!-- Symbol & TF -->
+    <div class="sidebar-section">
+      <div class="section-label">Instrument</div>
+      <label class="field-label">Symbol</label>
+      <input type="text" id="symbol" value="XAUUSD" placeholder="e.g. EURUSD, XAUUSD, V75">
+      <div class="row2" style="margin-top:8px">
+        <div>
+          <label class="field-label">Timeframe</label>
+          <select id="chartTF">
+            <option>M1</option><option>M5</option><option>M15</option>
+            <option selected>M30</option><option>H1</option><option>H4</option>
+            <option>D1</option><option>W1</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label">HTF Bias TF</label>
+          <select id="htfTF">
+            <option>M15</option><option>M30</option><option>H1</option>
+            <option selected>H4</option><option>D1</option><option>W1</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- OHLC + Price -->
+    <div class="sidebar-section">
+      <div class="section-label">Current Bar (OHLC)</div>
+      <div class="row2">
+        <div><label class="field-label">Open</label><input type="number" id="open" step="any" placeholder="Open"></div>
+        <div><label class="field-label">High</label><input type="number" id="high" step="any" placeholder="High"></div>
+        <div style="margin-top:8px"><label class="field-label">Low</label><input type="number" id="low" step="any" placeholder="Low"></div>
+        <div style="margin-top:8px"><label class="field-label">Close</label><input type="number" id="close" step="any" placeholder="Close"></div>
+      </div>
+      <label class="field-label" style="margin-top:8px">Current Bid Price</label>
+      <input type="number" id="bid" step="any" placeholder="Current bid">
+    </div>
+
+    <!-- Indicator Values -->
+    <div class="sidebar-section">
+      <div class="section-label">Indicator Values</div>
+      <div class="row2">
+        <div><label class="field-label">ATR Value</label><input type="number" id="atr" step="any" placeholder="e.g. 1.25"></div>
+        <div><label class="field-label">RSI Value</label><input type="number" id="rsi" step="any" placeholder="0–100" min="0" max="100"></div>
+      </div>
+      <div class="row2" style="margin-top:8px">
+        <div><label class="field-label">BB Upper</label><input type="number" id="bbUpper" step="any" placeholder="Upper band"></div>
+        <div><label class="field-label">BB Lower</label><input type="number" id="bbLower" step="any" placeholder="Lower band"></div>
+      </div>
+      <label class="field-label" style="margin-top:8px">HTF EMA-200 Value</label>
+      <input type="number" id="htfEma" step="any" placeholder="HTF EMA200 level">
+      <label class="field-label" style="margin-top:8px">HTF Close Price</label>
+      <input type="number" id="htfClose" step="any" placeholder="HTF candle close">
+    </div>
+
+    <!-- Structure -->
+    <div class="sidebar-section">
+      <div class="section-label">SMC Structure (tick all that apply)</div>
+      <label class="field-label">Sweep</label>
+      <div class="toggle-group">
+        <button class="toggle-btn" id="tgl_swpLow" onclick="toggle(this)">Swept Low</button>
+        <button class="toggle-btn" id="tgl_swpHigh" onclick="toggle(this)">Swept High</button>
+      </div>
+      <label class="field-label" style="margin-top:10px">Break of Structure</label>
+      <div class="toggle-group">
+        <button class="toggle-btn" id="tgl_bosUp" onclick="toggle(this)">BOS +</button>
+        <button class="toggle-btn sell-toggle" id="tgl_bosDown" onclick="toggle(this)">BOS -</button>
+      </div>
+      <label class="field-label" style="margin-top:10px">FVG Retest</label>
+      <div class="toggle-group">
+        <button class="toggle-btn" id="tgl_fvgBull" onclick="toggle(this)">Bull FVG</button>
+        <button class="toggle-btn sell-toggle" id="tgl_fvgBear" onclick="toggle(this)">Bear FVG</button>
+      </div>
+      <label class="field-label" style="margin-top:10px">FVG Zone (optional)</label>
+      <div class="row2">
+        <div><label class="field-label">FVG Upper</label><input type="number" id="fvgUpper" step="any" placeholder="Upper"></div>
+        <div><label class="field-label">FVG Lower</label><input type="number" id="fvgLower" step="any" placeholder="Lower"></div>
+      </div>
+    </div>
+
+    <!-- Parameters -->
+    <div class="sidebar-section">
+      <div class="section-label">EA Parameters</div>
+      <div class="row2">
+        <div><label class="field-label">ATR SL Mult</label><input type="number" id="slMult" value="1.5" step="0.1" min="0.1"></div>
+        <div><label class="field-label">ATR TP Mult</label><input type="number" id="tpMult" value="3.0" step="0.1" min="0.1"></div>
+      </div>
+      <div class="row2" style="margin-top:8px">
+        <div><label class="field-label">RSI OS Level</label><input type="number" id="rsiOs" value="30" min="0" max="100"></div>
+        <div><label class="field-label">RSI OB Level</label><input type="number" id="rsiOb" value="70" min="0" max="100"></div>
+      </div>
+    </div>
+
+    <button class="btn-analyse" onclick="analyse()">▶ RUN ANALYSIS</button>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <main class="main">
+    <div class="tabs">
+      <div class="tab active" onclick="showTab('overview', this)">Overview</div>
+      <div class="tab" onclick="showTab('signals', this)">Signals</div>
+      <div class="tab" onclick="showTab('filters', this)">Filters</div>
+      <div class="tab" onclick="showTab('levels', this)">Levels</div>
+      <div class="tab" onclick="showTab('log', this)">Log</div>
+    </div>
+
+    <!-- OVERVIEW TAB -->
+    <div class="tab-content active" id="tab-overview">
+      <div class="empty-state" id="emptyOverview">
+        <div class="empty-icon">◈</div>
+        <div>Fill in trade data on the left,<br>then click <strong style="color:var(--buy)">RUN ANALYSIS</strong></div>
+      </div>
+      <div id="overviewContent" style="display:none">
+        <div class="metric-grid" id="metricCards"></div>
+        <div class="two-col">
+          <div class="analysis-block" id="biasBlock"></div>
+          <div class="analysis-block" id="scoreBlock"></div>
+        </div>
+        <div class="analysis-block" id="verdictBlock"></div>
+      </div>
+    </div>
+
+    <!-- SIGNALS TAB -->
+    <div class="tab-content" id="tab-signals">
+      <div class="empty-state" id="emptySignals">
+        <div class="empty-icon">◉</div>
+        <div>Run analysis to see signal breakdown</div>
+      </div>
+      <div id="signalsContent" style="display:none">
+        <div class="analysis-block" id="signalRows"></div>
+        <div class="analysis-block" id="sltpBlock"></div>
+      </div>
+    </div>
+
+    <!-- FILTERS TAB -->
+    <div class="tab-content" id="tab-filters">
+      <div class="empty-state" id="emptyFilters">
+        <div class="empty-icon">⬡</div>
+        <div>Run analysis to see filter breakdown</div>
+      </div>
+      <div id="filtersContent" style="display:none">
+        <div class="analysis-block" id="filterChecks"></div>
+        <div class="chart-wrap" id="scoreChartWrap">
+          <canvas id="scoreChart" role="img" aria-label="Signal score breakdown radar chart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- LEVELS TAB -->
+    <div class="tab-content" id="tab-levels">
+      <div class="empty-state" id="emptyLevels">
+        <div class="empty-icon">◫</div>
+        <div>Run analysis to see price levels</div>
+      </div>
+      <div id="levelsContent" style="display:none">
+        <div class="analysis-block" id="levelsBlock"></div>
+        <div class="analysis-block" id="fvgBlock"></div>
+        <div class="chart-wrap" id="levelsChartWrap">
+          <canvas id="levelsChart" role="img" aria-label="Price levels bar chart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- LOG TAB -->
+    <div class="tab-content" id="tab-log">
+      <div class="analysis-block" style="height:100%">
+        <div class="block-title neutral-block">Analysis Log</div>
+        <pre id="logOutput" style="font-family:var(--mono);font-size:11px;color:var(--text2);line-height:1.8;white-space:pre-wrap;word-break:break-all;">No analysis run yet.</pre>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ── Toggle helper ──
+function toggle(btn) {
+  btn.classList.toggle('active');
+}
+function isOn(id) {
+  return document.getElementById(id).classList.contains('active');
+}
+function v(id) {
+  const el = document.getElementById(id);
+  return el ? parseFloat(el.value) || 0 : 0;
+}
+function s(id) {
+  const el = document.getElementById(id);
+  return el ? el.value.trim() : '';
+}
+
+// ── Tab switching ──
+function showTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+// ── Main analysis ──
+let radarChart = null;
+let levelsChartInst = null;
+
+function analyse() {
+  const btn = document.querySelector('.btn-analyse');
+  btn.disabled = true;
+  btn.textContent = '⟳ ANALYSING…';
+
+  setTimeout(() => {
+    runAnalysis();
+    btn.disabled = false;
+    btn.textContent = '▶ RUN ANALYSIS';
+  }, 300);
+}
+
+function runAnalysis() {
+  const sym    = s('symbol') || 'UNKNOWN';
+  const tf     = s('chartTF');
+  const htfTf  = s('htfTF');
+  const O      = v('open'), H = v('high'), L = v('low'), C = v('close');
+  const bid    = v('bid');
+  const atr    = v('atr');
+  const rsi    = v('rsi');
+  const bbU    = v('bbUpper'), bbL = v('bbLower');
+  const htfEma = v('htfEma'), htfClose = v('htfClose');
+  const slMult = v('slMult') || 1.5;
+  const tpMult = v('tpMult') || 3.0;
+  const rsiOs  = v('rsiOs') || 30;
+  const rsiOb  = v('rsiOb') || 70;
+  const fvgU   = v('fvgUpper'), fvgL = v('fvgLower');
+
+  const swpLow  = isOn('tgl_swpLow');
+  const swpHigh = isOn('tgl_swpHigh');
+  const bosUp   = isOn('tgl_bosUp');
+  const bosDown = isOn('tgl_bosDown');
+  const fvgBull = isOn('tgl_fvgBull');
+  const fvgBear = isOn('tgl_fvgBear');
+
+  const log = [];
+  const ts = new Date().toISOString().replace('T',' ').slice(0,19);
+  log.push(`[${ts}] === Universal SMC Analysis ===`);
+  log.push(`[${ts}] Symbol: ${sym}  TF: ${tf}  HTF: ${htfTf}`);
+  log.push(`[${ts}] OHLC: O=${O} H=${H} L=${L} C=${C}`);
+  log.push(`[${ts}] ATR=${atr}  RSI=${rsi}  BB[${bbL},${bbU}]`);
+  log.push(`[${ts}] HTF EMA200=${htfEma}  HTF Close=${htfClose}`);
+
+  // ── HTF Bias ──
+  let htfBias = 0;
+  if (htfEma && htfClose && atr) {
+    const emaDistance = Math.abs(htfClose - htfEma);
+    if (emaDistance < atr) {
+      htfBias = 0;
+      log.push(`[${ts}] HTF BIAS: NEUTRAL (price within 1 ATR of EMA, dead-zone)`);
+    } else {
+      htfBias = htfClose > htfEma ? 1 : -1;
+      log.push(`[${ts}] HTF BIAS: ${htfBias===1?'BULLISH':'BEARISH'} (htfClose=${htfClose} vs EMA=${htfEma})`);
+    }
+  } else if (htfEma && htfClose) {
+    htfBias = htfClose > htfEma ? 1 : -1;
+    log.push(`[${ts}] HTF BIAS: ${htfBias===1?'BULLISH':'BEARISH'} (no ATR dead-zone check — ATR not provided)`);
+  } else {
+    log.push(`[${ts}] HTF BIAS: UNKNOWN (provide HTF EMA200 and HTF Close)`);
+  }
+
+  // ── Signal scoring ──
+  function scoreSignal(dir) {
+    let score = 0;
+    const details = [];
+    // RSI
+    if (rsi) {
+      if (dir === 1 && rsi < rsiOs + 10) { score++; details.push({ lbl:'RSI oversold', pass:true, note:`RSI ${rsi.toFixed(1)} < ${rsiOs+10}` }); }
+      else if (dir === -1 && rsi > rsiOb - 10) { score++; details.push({ lbl:'RSI overbought', pass:true, note:`RSI ${rsi.toFixed(1)} > ${rsiOb-10}` }); }
+      else { details.push({ lbl:`RSI filter`, pass:false, note:`RSI ${rsi.toFixed(1)} (no edge for ${dir===1?'BUY':'SELL'})` }); }
+    } else { details.push({ lbl:'RSI filter', pass:'?', note:'RSI not provided' }); }
+    // BB
+    if (bbU && bbL && C) {
+      if (dir === 1 && C <= bbL) { score++; details.push({ lbl:'Price ≤ BB lower', pass:true, note:`Close ${C} ≤ BB lower ${bbL}` }); }
+      else if (dir === -1 && C >= bbU) { score++; details.push({ lbl:'Price ≥ BB upper', pass:true, note:`Close ${C} ≥ BB upper ${bbU}` }); }
+      else { details.push({ lbl:'BB band filter', pass:false, note:`Close ${C} not at ${dir===1?'lower':'upper'} band` }); }
+    } else { details.push({ lbl:'BB filter', pass:'?', note:'BB values not provided' }); }
+    // FVG
+    if ((dir===1 && fvgBull) || (dir===-1 && fvgBear)) { score++; details.push({ lbl:`${dir===1?'Bull':'Bear'} FVG active`, pass:true, note:'FVG retest zone present' }); }
+    else { details.push({ lbl:'FVG retest', pass:false, note:`No ${dir===1?'bull':'bear'} FVG active` }); }
+    // ATR momentum — we can't measure without history, flag as advisory
+    details.push({ lbl:'ATR momentum', pass:'?', note:'Requires historical ATR data (advisory)' });
+    // HTF bias
+    if (htfBias === dir) { score++; details.push({ lbl:'HTF bias aligned', pass:true, note:`HTF is ${dir===1?'bullish':'bearish'}` }); }
+    else if (htfBias === 0) { details.push({ lbl:'HTF bias', pass:'?', note:'Neutral dead-zone' }); }
+    else { details.push({ lbl:'HTF bias misaligned', pass:false, note:`HTF bias ${htfBias===1?'bullish':'bearish'} vs ${dir===1?'BUY':'SELL'} signal` }); }
+    return { score, details };
+  }
+
+  // ── Buy signal check ──
+  const buyStructure = swpLow && bosUp && fvgBull;
+  const sellStructure = swpHigh && bosDown && fvgBear;
+
+  const buyScore = scoreSignal(1);
+  const sellScore = scoreSignal(-1);
+
+  log.push(`[${ts}] BUY structure: swpLow=${swpLow} bosUp=${bosUp} fvgBull=${fvgBull} → ${buyStructure?'VALID':'NOT MET'}`);
+  log.push(`[${ts}] SELL structure: swpHigh=${swpHigh} bosDown=${bosDown} fvgBear=${fvgBear} → ${sellStructure?'VALID':'NOT MET'}`);
+  log.push(`[${ts}] BUY score: ${buyScore.score}/5`);
+  log.push(`[${ts}] SELL score: ${sellScore.score}/5`);
+
+  // ── SL / TP ──
+  const slDist = atr * slMult;
+  const tpDist = atr * tpMult;
+  const buyEntry  = L || bid;
+  const sellEntry = H || bid;
+  const buySL     = buyEntry  - slDist;
+  const buyTP     = buyEntry  + tpDist;
+  const sellSL    = sellEntry + slDist;
+  const sellTP    = sellEntry - tpDist;
+  const buyRR     = tpMult / slMult;
+  const sellRR    = tpMult / slMult;
+
+  log.push(`[${ts}] BUY levels — Entry:${buyEntry.toFixed(5)} SL:${buySL.toFixed(5)} TP:${buyTP.toFixed(5)} RR:1:${buyRR.toFixed(1)}`);
+  log.push(`[${ts}] SELL levels — Entry:${sellEntry.toFixed(5)} SL:${sellSL.toFixed(5)} TP:${sellTP.toFixed(5)} RR:1:${sellRR.toFixed(1)}`);
+
+  // ── Verdict ──
+  let verdict = 'NO SIGNAL';
+  let verdictDir = 0;
+  if (buyStructure && (htfBias === 1 || htfBias === 0)) { verdict = 'BUY'; verdictDir = 1; }
+  if (sellStructure && (htfBias === -1 || htfBias === 0)) { verdict = 'SELL'; verdictDir = -1; }
+  if (buyStructure && sellStructure) { verdict = 'CONFLICTED'; verdictDir = 0; }
+
+  log.push(`[${ts}] VERDICT: ${verdict}`);
+  log.push(`[${ts}] === End of Analysis ===`);
+
+  document.getElementById('logOutput').textContent = log.join('\n');
+
+  // ── Update UI ──
+  updateOverview(sym, tf, htfTf, htfBias, buyStructure, sellStructure, buyScore, sellScore, verdict, verdictDir, atr, rsi, C, O, H, L);
+  updateSignals(buyStructure, sellStructure, buyEntry, sellEntry, buySL, buyTP, sellSL, sellTP, buyRR, sellRR, verdict, verdictDir);
+  updateFilters(buyScore, sellScore, verdictDir);
+  updateLevels(buyEntry, sellEntry, buySL, buyTP, sellSL, sellTP, fvgU, fvgL, atr, C, O, H, L);
+
+  document.getElementById('emptyOverview').style.display = 'none';
+  document.getElementById('overviewContent').style.display = 'block';
+  document.getElementById('emptySignals').style.display = 'none';
+  document.getElementById('signalsContent').style.display = 'block';
+  document.getElementById('emptyFilters').style.display = 'none';
+  document.getElementById('filtersContent').style.display = 'block';
+  document.getElementById('emptyLevels').style.display = 'none';
+  document.getElementById('levelsContent').style.display = 'block';
+
+  document.getElementById('headerMeta').textContent = `${sym} · ${tf} · ${ts}`;
+}
+
+function fmt(n, d=5) {
+  if (!n || isNaN(n)) return '—';
+  return parseFloat(n).toFixed(d);
+}
+
+function updateOverview(sym, tf, htfTf, htfBias, buyStruct, sellStruct, buyScore, sellScore, verdict, verdictDir, atr, rsi, C, O, H, L) {
+  // Metric cards
+  const activeScore = verdictDir === 1 ? buyScore.score : verdictDir === -1 ? sellScore.score : Math.max(buyScore.score, sellScore.score);
+  const dirClass = verdictDir===1?'buy':verdictDir===-1?'sell':'gold';
+  document.getElementById('metricCards').innerHTML = `
+    <div class="metric-card ${dirClass}"><div class="m-label">Signal</div><div class="m-value">${verdict}</div><div class="m-sub">${sym} · ${tf}</div></div>
+    <div class="metric-card ${dirClass}"><div class="m-label">Score</div><div class="m-value">${activeScore}/5</div><div class="m-sub">Signal strength</div>
+      <div class="score-bar-wrap"><div class="score-bar" style="width:${activeScore/5*100}%;background:${activeScore>=4?'var(--buy)':activeScore>=2?'var(--gold)':'var(--sell)'}"></div></div>
+    </div>
+    <div class="metric-card"><div class="m-label">ATR</div><div class="m-value">${atr?parseFloat(atr).toFixed(atr>100?2:5):'—'}</div><div class="m-sub">Volatility</div></div>
+    <div class="metric-card purple"><div class="m-label">RSI</div><div class="m-value">${rsi?parseFloat(rsi).toFixed(1):'—'}</div><div class="m-sub">${rsi>70?'Overbought':rsi<30?'Oversold':'Neutral'}</div></div>
+  `;
+
+  // HTF Bias block
+  const biasLabel = htfBias===1?'BULLISH':htfBias===-1?'BEARISH':'NEUTRAL';
+  const biasClass = htfBias===1?'bull':htfBias===-1?'bear':'neutral';
+  document.getElementById('biasBlock').innerHTML = `
+    <div class="block-title ${htfBias===1?'':'htfBias===-1?'sell-block ':'''}neutral-block">HTF Bias · ${s('htfTF')}</div>
+    <div class="bias-pill ${biasClass}"><div class="bias-dot"></div>${biasLabel}</div>
+    <div style="margin-top:10px;font-size:12px;color:var(--text2);line-height:1.6">
+      HTF Close: <span style="color:var(--text);font-family:var(--mono)">${fmt(v('htfClose'))}</span><br>
+      EMA-200: <span style="color:var(--text);font-family:var(--mono)">${fmt(v('htfEma'))}</span><br>
+      Distance: <span style="color:var(--gold);font-family:var(--mono)">${v('htfEma')&&v('htfClose')?Math.abs(v('htfClose')-v('htfEma')).toFixed(5):'—'}</span>
+    </div>
+  `;
+
+  // Score comparison block
+  const maxScore = 5;
+  document.getElementById('scoreBlock').innerHTML = `
+    <div class="block-title neutral-block">Score Breakdown</div>
+    <div style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px"><span style="color:var(--buy)">BUY</span><span style="font-family:var(--mono);color:var(--buy)">${buyScore.score}/5</span></div>
+      <div class="score-bar-wrap"><div class="score-bar" style="width:${buyScore.score/maxScore*100}%;background:var(--buy)"></div></div>
+    </div>
+    <div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px"><span style="color:var(--sell)">SELL</span><span style="font-family:var(--mono);color:var(--sell)">${sellScore.score}/5</span></div>
+      <div class="score-bar-wrap"><div class="score-bar" style="width:${sellScore.score/maxScore*100}%;background:var(--sell)"></div></div>
+    </div>
+    <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+      <span class="badge ${buyStruct?'buy':'neutral'}">BUY struct: ${buyStruct?'✓':'✗'}</span>
+      <span class="badge ${sellStruct?'sell':'neutral'}">SELL struct: ${sellStruct?'✓':'✗'}</span>
+    </div>
+  `;
+
+  // Verdict block
+  const verdictColor = verdictDir===1?'var(--buy)':verdictDir===-1?'var(--sell)':'var(--gold)';
+  const verdictBg = verdictDir===1?'var(--buy-dim)':verdictDir===-1?'var(--sell-dim)':'rgba(244,185,66,0.06)';
+  const verdictBorder = verdictDir===1?'rgba(0,212,160,0.2)':verdictDir===-1?'rgba(255,83,112,0.2)':'rgba(244,185,66,0.2)';
+  const advice = getAdvice(verdict, verdictDir, activeScore, htfBias, C, O);
+  document.getElementById('verdictBlock').innerHTML = `
+    <div class="block-title ${verdictDir===1?'':'verdictDir===-1?'sell-block ':'''}neutral-block">Verdict</div>
+    <div style="background:${verdictBg};border:1px solid ${verdictBorder};border-radius:8px;padding:16px">
+      <div style="font-family:var(--mono);font-size:20px;font-weight:700;color:${verdictColor};margin-bottom:8px">${verdict}</div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.7">${advice}</div>
+    </div>
+  `;
+}
+
+function getAdvice(verdict, dir, score, htfBias, C, O) {
+  if (verdict === 'NO SIGNAL') {
+    return 'Structure conditions not met. Wait for a sweep + BOS + FVG retest to align before considering an entry. Patience is edge.';
+  }
+  if (verdict === 'CONFLICTED') {
+    return 'Both buy and sell structure conditions are active simultaneously — this is unusual. Re-check your toggle selections. Avoid trading during conflicting structure.';
+  }
+  const barBias = C > O ? 'bullish' : C < O ? 'bearish' : 'neutral';
+  const htfStr = htfBias===1?'aligned (bullish)':htfBias===-1?'misaligned (bearish)':'neutral';
+  const quality = score >= 4 ? 'High-quality' : score >= 2 ? 'Moderate-quality' : 'Low-quality';
+  return `${quality} ${verdict} setup. Current bar is ${barBias}. HTF bias is ${htfStr}. 
+${score >= 4 ? 'All major filters confirm — proceed with disciplined position sizing.' 
+  : score >= 2 ? 'Some filters confirm. Consider reducing lot size or waiting for additional confluence.' 
+  : 'Few filters confirm. High-risk entry — consider skipping or monitoring for improvement.'}`;
+}
+
+function updateSignals(buyStruct, sellStruct, buyEntry, sellEntry, buySL, buyTP, sellSL, sellTP, buyRR, sellRR, verdict, verdictDir) {
+  let rows = '';
+  if (buyStruct) {
+    rows += `<div class="signal-row buy">
+      <div class="sig-dir buy">BUY</div>
+      <div class="sig-text">Sweep Low + BOS+ + Bull FVG retest<br><span class="badge buy">STRUCTURE MET</span></div>
+      <div class="sig-score">${document.getElementById('tgl_swpLow').classList.contains('active')?'✓':''} ${document.getElementById('tgl_bosUp').classList.contains('active')?'✓':''} ${document.getElementById('tgl_fvgBull').classList.contains('active')?'✓':''}</div>
+    </div>`;
+  }
+  if (sellStruct) {
+    rows += `<div class="signal-row sell">
+      <div class="sig-dir sell">SELL</div>
+      <div class="sig-text">Sweep High + BOS- + Bear FVG retest<br><span class="badge sell">STRUCTURE MET</span></div>
+      <div class="sig-score">✓ ✓ ✓</div>
+    </div>`;
+  }
+  if (!buyStruct && !sellStruct) {
+    const missing = [];
+    if (!document.getElementById('tgl_swpLow').classList.contains('active') && !document.getElementById('tgl_swpHigh').classList.contains('active')) missing.push('Sweep');
+    if (!document.getElementById('tgl_bosUp').classList.contains('active') && !document.getElementById('tgl_bosDown').classList.contains('active')) missing.push('BOS');
+    if (!document.getElementById('tgl_fvgBull').classList.contains('active') && !document.getElementById('tgl_fvgBear').classList.contains('active')) missing.push('FVG retest');
+    rows += `<div class="signal-row neutral"><div class="sig-dir" style="color:var(--text3)">WAIT</div><div class="sig-text">No valid structure. Missing: <strong style="color:var(--gold)">${missing.join(', ')||'combination'}</strong></div><div></div></div>`;
+  }
+  document.getElementById('signalRows').innerHTML = `<div class="block-title neutral-block">Signal Conditions</div>${rows}`;
+
+  // SL/TP
+  const d = buyEntry > 100 ? 2 : 5;
+  document.getElementById('sltpBlock').innerHTML = `
+    <div class="block-title neutral-block">SL / TP Levels (ATR-Based)</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div>
+        <div style="font-size:11px;color:var(--buy);font-family:var(--mono);margin-bottom:8px">── BUY SETUP</div>
+        <div class="ohlc-grid" style="grid-template-columns:repeat(3,1fr)">
+          <div class="ohlc-cell"><div class="ohlc-lbl">Entry</div><div class="ohlc-val">${fmt(buyEntry,d)}</div></div>
+          <div class="ohlc-cell"><div class="ohlc-lbl">Stop</div><div class="ohlc-val" style="color:var(--sell)">${fmt(buySL,d)}</div></div>
+          <div class="ohlc-cell"><div class="ohlc-lbl">Target</div><div class="ohlc-val" style="color:var(--buy)">${fmt(buyTP,d)}</div></div>
+        </div>
+        <div style="font-size:11px;color:var(--text2);margin-top:8px;font-family:var(--mono)">R:R = 1:${buyRR.toFixed(1)}</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--sell);font-family:var(--mono);margin-bottom:8px">── SELL SETUP</div>
+        <div class="ohlc-grid" style="grid-template-columns:repeat(3,1fr)">
+          <div class="ohlc-cell"><div class="ohlc-lbl">Entry</div><div class="ohlc-val">${fmt(sellEntry,d)}</div></div>
+          <div class="ohlc-cell"><div class="ohlc-lbl">Stop</div><div class="ohlc-val" style="color:var(--sell)">${fmt(sellSL,d)}</div></div>
+          <div class="ohlc-cell"><div class="ohlc-lbl">Target</div><div class="ohlc-val" style="color:var(--buy)">${fmt(sellTP,d)}</div></div>
+        </div>
+        <div style="font-size:11px;color:var(--text2);margin-top:8px;font-family:var(--mono)">R:R = 1:${sellRR.toFixed(1)}</div>
+      </div>
+    </div>
+  `;
+}
+
+function updateFilters(buyScore, sellScore, verdictDir) {
+  const useDir = verdictDir !== 0 ? verdictDir : 1;
+  const score = verdictDir !== 0 ? (verdictDir===1?buyScore:sellScore) : buyScore;
+
+  function icon(pass) {
+    if (pass === true) return '<span class="check-icon pass">✔</span>';
+    if (pass === false) return '<span class="check-icon fail">✘</span>';
+    return '<span class="check-icon warn">?</span>';
+  }
+
+  let items = '';
+  score.details.forEach(d => {
+    items += `<li>${icon(d.pass)}<div><strong style="color:var(--text);font-weight:500">${d.lbl}</strong><br><span>${d.note}</span></div></li>`;
+  });
+
+  document.getElementById('filterChecks').innerHTML = `
+    <div class="block-title ${verdictDir===1?'':'verdictDir===-1?'sell-block ':'''}neutral-block">Filter Results · ${verdictDir===1?'BUY':verdictDir===-1?'SELL':'BUY'} Setup</div>
+    <ul class="checklist">${items}</ul>
+  `;
+
+  // Radar chart
+  const bData = [
+    buyScore.details[0].pass===true?1:0,
+    buyScore.details[1].pass===true?1:0,
+    buyScore.details[2].pass===true?1:0,
+    buyScore.details[3].pass===true?1:0,
+    buyScore.details[4].pass===true?1:0,
+  ];
+  const sData = [
+    sellScore.details[0].pass===true?1:0,
+    sellScore.details[1].pass===true?1:0,
+    sellScore.details[2].pass===true?1:0,
+    sellScore.details[3].pass===true?1:0,
+    sellScore.details[4].pass===true?1:0,
+  ];
+
+  if (radarChart) { radarChart.destroy(); radarChart = null; }
+  const ctx = document.getElementById('scoreChart').getContext('2d');
+  radarChart = new Chart(ctx, {
+    type: 'radar',
+    data: {
+      labels: ['RSI','BB Band','FVG','ATR Momentum','HTF Bias'],
+      datasets: [
+        { label:'BUY score', data: bData, borderColor:'#00d4a0', backgroundColor:'rgba(0,212,160,0.15)', pointBackgroundColor:'#00d4a0', borderWidth:2 },
+        { label:'SELL score', data: sData, borderColor:'#ff5370', backgroundColor:'rgba(255,83,112,0.1)', pointBackgroundColor:'#ff5370', borderWidth:2, borderDash:[4,3] }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:false } },
+      scales: {
+        r: {
+          min:0, max:1, ticks:{ display:false },
+          grid:{ color:'rgba(255,255,255,0.07)' },
+          pointLabels:{ color:'#7a8299', font:{ family:'Space Mono', size:10 } },
+          angleLines:{ color:'rgba(255,255,255,0.07)' }
+        }
+      }
+    }
+  });
+
+  // Custom legend
+  document.getElementById('scoreChartWrap').insertAdjacentHTML('beforebegin',
+    `<div id="radarLegend" style="display:flex;gap:16px;margin-bottom:8px;font-size:12px;color:var(--text2);padding:0 2px">
+      <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#00d4a0;display:inline-block"></span>BUY ${buyScore.score}/5</span>
+      <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#ff5370;display:inline-block"></span>SELL ${sellScore.score}/5</span>
+    </div>`
+  );
+}
+
+function updateLevels(buyEntry, sellEntry, buySL, buyTP, sellSL, sellTP, fvgU, fvgL, atr, C, O, H, L) {
+  const d = buyEntry > 100 ? 2 : 5;
+
+  document.getElementById('levelsBlock').innerHTML = `
+    <div class="block-title neutral-block">Key Price Levels</div>
+    <div class="ohlc-grid">
+      <div class="ohlc-cell"><div class="ohlc-lbl">Open</div><div class="ohlc-val">${fmt(O,d)}</div></div>
+      <div class="ohlc-cell"><div class="ohlc-lbl">High</div><div class="ohlc-val" style="color:var(--buy)">${fmt(H,d)}</div></div>
+      <div class="ohlc-cell"><div class="ohlc-lbl">Low</div><div class="ohlc-val" style="color:var(--sell)">${fmt(L,d)}</div></div>
+      <div class="ohlc-cell"><div class="ohlc-lbl">Close</div><div class="ohlc-val">${fmt(C,d)}</div></div>
+    </div>
+    <div style="margin-top:14px;font-size:12px;color:var(--text2);line-height:1.8">
+      <span style="color:var(--text3);font-family:var(--mono);font-size:10px">ATR SL distance: </span><span style="color:var(--sell);font-family:var(--mono)">${atr?(atr*v('slMult')).toFixed(d):'—'}</span>
+      &nbsp;&nbsp;
+      <span style="color:var(--text3);font-family:var(--mono);font-size:10px">ATR TP distance: </span><span style="color:var(--buy);font-family:var(--mono)">${atr?(atr*v('tpMult')).toFixed(d):'—'}</span>
+    </div>
+  `;
+
+  // FVG block
+  if (fvgU && fvgL) {
+    const isBull = document.getElementById('tgl_fvgBull').classList.contains('active');
+    const midFvg = ((fvgU+fvgL)/2).toFixed(d);
+    document.getElementById('fvgBlock').innerHTML = `
+      <div class="block-title ${isBull?'':'sell-block'}neutral-block">FVG Zone</div>
+      <div style="background:${isBull?'var(--buy-dim)':'var(--sell-dim)'};border:1px solid ${isBull?'rgba(0,212,160,0.2)':'rgba(255,83,112,0.2)'};border-radius:8px;padding:14px">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;text-align:center">
+          <div><div style="font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase">Upper</div><div style="font-family:var(--mono);font-size:14px;color:var(--text)">${fmt(fvgU,d)}</div></div>
+          <div><div style="font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase">Mid</div><div style="font-family:var(--mono);font-size:14px;color:${isBull?'var(--buy)':'var(--sell)'}">${midFvg}</div></div>
+          <div><div style="font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase">Lower</div><div style="font-family:var(--mono);font-size:14px;color:var(--text)">${fmt(fvgL,d)}</div></div>
+        </div>
+        <div style="margin-top:10px;text-align:center"><span class="badge ${isBull?'buy':'sell'}">${isBull?'BULLISH FVG':'BEARISH FVG'}</span></div>
+      </div>
+    `;
+  } else {
+    document.getElementById('fvgBlock').innerHTML = `<div class="block-title neutral-block">FVG Zone</div><div style="color:var(--text3);font-size:12px;font-family:var(--mono)">No FVG zone values entered.</div>`;
+  }
+
+  // Levels chart
+  if (levelsChartInst) { levelsChartInst.destroy(); levelsChartInst = null; }
+  const ctx2 = document.getElementById('levelsChart').getContext('2d');
+  const allLevels = [L, buySL, sellSL, C, O, buyTP, sellTP, H].filter(x => x && !isNaN(x));
+  if (allLevels.length < 2) { document.getElementById('levelsChartWrap').style.display='none'; return; }
+  document.getElementById('levelsChartWrap').style.display='block';
+
+  const labels = ['Low','Buy SL','Sell SL','Close','Open','Buy TP','Sell TP','High'];
+  const vals   = [L, buySL, sellSL, C, O, buyTP, sellTP, H];
+  const colors = vals.map((v,i) => {
+    if (i===0) return '#ff5370';
+    if (i===1||i===2) return '#ff537077';
+    if (i===3||i===4) return '#a78bfa';
+    if (i===5||i===6) return '#00d4a077';
+    return '#00d4a0';
+  });
+
+  levelsChartInst = new Chart(ctx2, {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[{
+        label:'Price',
+        data: vals,
+        backgroundColor: colors,
+        borderColor: colors,
+        borderWidth:1,
+        borderRadius:4,
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{
+        y:{
+          grid:{ color:'rgba(255,255,255,0.05)' },
+          ticks:{ color:'#7a8299', font:{family:'Space Mono',size:10}, callback:v=>parseFloat(v).toFixed(d>3?2:d) }
+        },
+        x:{ grid:{display:false}, ticks:{color:'#7a8299', font:{family:'Space Mono',size:9}} }
+      }
+    }
+  });
+}
+
+// Remove old radar legend if re-running
+const origUpdateFilters = updateFilters;
+updateFilters = function(...args) {
+  const old = document.getElementById('radarLegend');
+  if(old) old.remove();
+  origUpdateFilters.apply(this, args);
+};
+</script>
+</body>
+</html>
